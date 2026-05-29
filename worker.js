@@ -627,7 +627,7 @@ echo "[+] 引擎更新成功！全息日志和5秒超高频机制已加载。"
       if (results) {
         for (let server of results) {
           for (let node of JSON.parse(server.details)) {
-            proxyList.push(`socks5://${PROXY_USER}:${PROXY_PASS}@${server.ip}:${node.port}#${node.country}_ _${node.node_ip || 'IP'}`);
+            proxyList.push(`socks5://${PROXY_USER}:${PROXY_PASS}@${server.ip}:${node.port}#${node.country}_Node_${node.node_ip || 'IP'}`);
           }
         }
       }
