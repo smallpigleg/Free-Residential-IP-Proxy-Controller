@@ -220,7 +220,7 @@ def start_proxy_server(host: str, port: int, bind_interface: str = "tun0") -> No
     }
 
     // ====================================================
-    // [3] 动态分发：Lite Manager 调度引擎源码 (带有强制换IP功能)
+    // [3] 动态分发：Lite Manager 调度引擎源码 (增加AI测试功能)
     // ====================================================
     if (url.pathname === "/scripts/lite_manager.py") {
       const MANAGER_CODE = `#!/usr/bin/env python3
@@ -244,7 +244,7 @@ current_ip = ""
 current_country = ""
 connected_at = 0
 is_connecting = False
-last_switch_trigger = 0  # 追踪换IP指令
+last_switch_trigger = 0  
 
 state_lock = threading.Lock()
 dead_ips = set()
@@ -412,12 +412,37 @@ def connect_node(node: dict):
                 return
 
             setup_routing()
+            time.sleep(1) # 给予系统路由表刷新时间
+            
+            # ===== 新增：AI与流媒体服务连通性检测 =====
+            print(f"[*] 节点 ({node['country']}) 正在进行流媒体与AI解锁测试 (YouTube/ChatGPT/Claude)...", flush=True)
+            services = {
+                "YouTube": "https://www.youtube.com",
+                "ChatGPT": "https://chatgpt.com",
+                "Claude": "https://claude.ai"
+            }
+            check_passed = True
+            for name, url in services.items():
+                res = subprocess.run(["curl", "-I", "-s", "-A", "Mozilla/5.0", "-m", "5", "--interface", "tun0", url], capture_output=True)
+                if res.returncode != 0:
+                    print(f"[-] 节点 ({node['country']}) 无法连通 {name} (ErrCode: {res.returncode})，直接拉黑更换: {node['ip']}", flush=True)
+                    check_passed = False
+                    break
+                    
+            if not check_passed:
+                try: process.terminate(); process.wait(timeout=2)
+                except: process.kill()
+                dead_ips.add(node["ip"])
+                with state_lock: is_connecting = False
+                return
+            # ==========================================
+
             with state_lock:
                 current_process = process
                 current_ip = node["ip"]
                 current_country = node["country"]
                 connected_at = time.time()
-            print(f"[+] 代理节点 ({node['country']}) 住宅IP完全就绪: {node['ip']}", flush=True)
+            print(f"[+] 代理节点 ({node['country']}) 完全就绪 (住宅与AI双重检测通过): {node['ip']}", flush=True)
             
         else:
             try: process.terminate(); process.wait(timeout=2)
@@ -608,7 +633,6 @@ echo "[+] 引擎更新成功！全息日志和5秒超高频机制已加载。"
         return new Response(JSON.stringify({ "0": "JP" }), { headers: { "Content-Type": "application/json" } });
     }
 
-    // 修改：允许写入 switch_trigger 时间戳指令
     if (url.pathname === "/api/config" && request.method === "POST") {
         const data = await request.json();
         const sanitizedMap = { "0": data["0"] || "JP" };
@@ -761,7 +785,6 @@ const DASHBOARD_HTML = (domain, webUser, webPass, proxyUser, proxyPass) => `
             alert('指令下发成功！代理引擎将自动平滑切换。');
         }
 
-        // 新增更换IP前端逻辑
         async function switchIP() {
             const val = document.getElementById(\`slot-cfg-0\`).value.toUpperCase().trim() || 'JP';
             await fetch('/api/config', {
@@ -790,7 +813,7 @@ const DASHBOARD_HTML = (domain, webUser, webPass, proxyUser, proxyPass) => `
                         \`<div class="inline-flex items-center bg-gray-700 border border-gray-600 rounded px-3 py-2 mr-2 mb-2 text-sm">
                             <span class="text-blue-400 font-bold mr-3">\${d.country}</span>
                             <span class="font-mono text-blue-200 mr-3" title="节点物理IP">\${d.node_ip || '分配中...'}:\${d.port}</span>
-                            <span class="text-green-400" title="已通过 ip.net.coffee 测伪判定">● 住宅IP就绪</span>
+                            <span class="text-green-400" title="已通过住宅 IP 与 AI 连通性双重检测">● 纯净解锁</span>
                         </div>\`
                     ).join('');
 
